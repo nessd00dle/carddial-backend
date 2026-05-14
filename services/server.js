@@ -161,7 +161,7 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/estadisticas', estadisticaRoutes);
 
 
-app.get('/test', (req, res) => {
+app.get('/', (req, res) => {
     res.json({ mensaje: 'Servidor funcionando correctamente' });
 });
 
