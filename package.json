@@ -1,0 +1,23 @@
+{
+  "name": "backend-prograweb",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "services/server.js",
+  "scripts": {
+    "start": "node services/server.js",
+    "dev": "node services/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.1.1",
+    "mongoose": "^9.2.4",
+    "multer": "^2.1.1",
+    "sharp": "^0.34.5",
+    "uuid": "^13.0.0"
+  }
+}
