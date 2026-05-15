@@ -82,6 +82,29 @@ app.use('/uploads', express.static(uploadsPath, {
     }
 }));
 
+app.get('/api/debug/db-info', async (req, res) => {
+    try {
+        const db = mongoose.connection;
+        const collections = await db.db.listCollections().toArray();
+        
+        // Contar franquicias
+        const Franquicia = (await import('./models/franquiciaModel.js')).default;
+        const franquiciasCount = await Franquicia.countDocuments();
+        const franquicias = await Franquicia.find().limit(5);
+        
+        res.json({
+            connected: db.readyState === 1,
+            databaseName: db.name,
+            host: db.host,
+            collections: collections.map(c => c.name),
+            franquiciasCount: franquiciasCount,
+            franquiciasMuestra: franquicias,
+            usuariosCount: await (await import('./models/Usuario.js')).default.countDocuments()
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.use('/uploads/cartas', express.static(path.join(uploadsPath, 'cartas')));
 app.use('/uploads/perfiles', express.static(path.join(uploadsPath, 'perfiles')));
