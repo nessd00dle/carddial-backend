@@ -160,10 +160,10 @@ app.use('/api/publicaciones/:idPublicacion/reacciones', reaccionRoutes);
 app.use('/api/reportes', reporteRoutes);
 app.use('/api/estadisticas', estadisticaRoutes);
 
-
 app.get('/', (req, res) => {
-    res.json({ mensaje: 'Servidor funcionando correctamente' });
+    res.send('API funcionando 🚀');
 });
+
 
 app.get('/debug/usuario/:id', async (req, res) => {
     try {
