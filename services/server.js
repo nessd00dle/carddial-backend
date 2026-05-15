@@ -161,7 +161,7 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/estadisticas', estadisticaRoutes);
 
 app.get('/', (req, res) => {
-    res.send('API funcionando 🚀');
+    res.send('API funcionando ');
 });
 
 
