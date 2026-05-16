@@ -65,32 +65,14 @@ cartaSchema.index({ valorEstimado: -1 });
 
 
 cartaSchema.virtual('imagenUrl').get(function () {
-    if (!this.imagen) return null;
+  if (!this.imagen) return null;
 
+  if (this.imagen.startsWith('http')) return this.imagen;
   
-    if (this.imagen && this.imagen.includes('cloudinary.com')) {
-        return this.imagen;
-    }
-
-
-    if (this.imagenPublicId) {
-        const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-        return `https://res.cloudinary.com/${cloudName}/image/upload/${this.imagenPublicId}`;
-    }
-
-    // Para desarrollo local o URLs antiguas
-    if (process.env.NODE_ENV === 'production') {
-     
-        return 'https://via.placeholder.com/300x300?text=Imagen+no+disponible';
-    }
-
-    // Desarrollo local (fallback)
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-    if (this.imagen.startsWith('/uploads')) {
-        return `${baseUrl}${this.imagen}`;
-    }
-    
-    return `${baseUrl}/uploads/cartas/${this.imagen}`;
+  if (process.env.NODE_ENV !== 'production') {
+    return `http://localhost:3000/uploads/cartas/${this.imagen}`;
+  }
+  return this.imagen;
 });
 
 // Método para obtener imagen optimizada
