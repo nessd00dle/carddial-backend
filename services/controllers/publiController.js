@@ -312,11 +312,16 @@ export const crearPublicacion = async (req, res) => {
 };
 
 
-// publiController.js - obtenerPublicaciones
+
+
 export const obtenerPublicaciones = async (req, res) => {
   try {
     const { tipo, pagina = 1, limite = 20 } = req.query;
     const skip = (pagina - 1) * limite;
+
+    // Obtener la URL base de la petición
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    console.log('Base URL:', baseUrl);
 
     let query = { Estado: 'activo' };
 
@@ -327,7 +332,6 @@ export const obtenerPublicaciones = async (req, res) => {
             query.Tipo = tipo;
         }
     }
-
     
     let publicacionesQuery = Publicacion.find(query)
       .sort({ createdAt: -1 })
@@ -336,7 +340,6 @@ export const obtenerPublicaciones = async (req, res) => {
       .populate('Idusuario', 'nombre nickname correo fotoPerfil')
       .populate('Franquicia', 'nombre slug');
 
-    
     if (tipo === 'coleccion') {
       publicacionesQuery = publicacionesQuery
         .populate({
@@ -351,15 +354,21 @@ export const obtenerPublicaciones = async (req, res) => {
           select: 'nombre imagen rareza descripcion'
         });
     }
-
     
     const publicaciones = await publicacionesQuery;
+
+    // Transformar las publicaciones para usar URLs relativas
+    const publicacionesTransformadas = publicaciones.map(pub => {
+        const pubObj = pub.toObject();
+        pubObj.fotosUrls = pub.Fotos ? pub.Fotos.map(foto => `/uploads/publicaciones/${foto}`) : [];
+        return pubObj;
+    });
 
     const total = await Publicacion.countDocuments(query);
 
     res.json({
       success: true,
-      publicaciones,
+      publicaciones: publicacionesTransformadas,
       paginacion: {
         total,
         pagina: parseInt(pagina),

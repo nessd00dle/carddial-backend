@@ -14,6 +14,7 @@ import cartaRoutes from "./routes/cartaRoutes.js";
 import coleccionRoutes from "./routes/coleccionRoutes.js";
 import reporteRoutes from './routes/reporteRoutes.js';
 import estadisticaRoutes from './routes/estadisticaRoutes.js';
+import mongoose from 'mongoose';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,21 +25,16 @@ const app = express();
 
 connectDB();
 
-// Middlewares
+// Configurar CORS
 app.use(cors({
-    origin: true,
+    origin: ['https://carddial-bjcxfac5acdxbvah.canadacentral-01.azurewebsites.net', 'http://localhost:5173', 'http://localhost:3000'],
     credentials: true
 }));
-/*app.use(cors({
-    origin: 'http://localhost:5173',
-    credentials: true
-}));*/
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-
-
+// Configurar ruta de uploads
 const uploadsPath = path.join(__dirname, '..', 'uploads');
 
 console.log('========================================');
@@ -48,49 +44,40 @@ console.log('Directorio actual:', __dirname);
 console.log('Ruta de uploads:', uploadsPath);
 console.log('Existe uploads?', fs.existsSync(uploadsPath));
 
-// Verificar estructura de carpetas
-if (fs.existsSync(uploadsPath)) {
-    console.log('Contenido de uploads:', fs.readdirSync(uploadsPath));
-    
-    const cartasPath = path.join(uploadsPath, 'cartas');
-    if (fs.existsSync(cartasPath)) {
-        console.log('Contenido de cartas:', fs.readdirSync(cartasPath));
-        
-        // Verificar subcarpetas
-        const subCarpetas = fs.readdirSync(cartasPath);
-        subCarpetas.forEach(carpeta => {
-            const carpetaPath = path.join(cartasPath, carpeta);
-            if (fs.statSync(carpetaPath).isDirectory()) {
-                const archivos = fs.readdirSync(carpetaPath);
-                console.log(`  ${carpeta}: ${archivos.length} archivos`);
-                if (archivos.length > 0) {
-                    console.log(`    Ejemplo: ${archivos[0]}`);
-                }
-            }
-        });
-    } else {
-        console.log('ERROR: No existe carpeta cartas');
-    }
-} else {
-    console.log('ERROR: No existe carpeta uploads');
-}
-
-
+// así se sirven los fokin archivos estáticos de uploads
 app.use('/uploads', express.static(uploadsPath, {
     setHeaders: (res, filePath) => {
+  
+        res.setHeader('Cache-Control', 'public, max-age=86400');
         console.log('Sirviendo archivo:', filePath);
     }
 }));
 
+// Rutas estáticas específicas (para compatibilidad)
+app.use('/uploads/publicaciones', express.static(path.join(uploadsPath, 'publicaciones')));
+app.use('/uploads/perfiles', express.static(path.join(uploadsPath, 'perfiles')));
+app.use('/uploads/cartas', express.static(path.join(uploadsPath, 'cartas')));
+
+// Endpoint para obtener URL correcta de imágenes
+app.get('/api/imagen/:tipo/:nombre', (req, res) => {
+    const { tipo, nombre } = req.params;
+    const imagePath = path.join(uploadsPath, tipo, nombre);
+    
+    if (fs.existsSync(imagePath)) {
+        res.sendFile(imagePath);
+    } else {
+        res.status(404).json({ error: 'Imagen no encontrada' });
+    }
+});
+
+// Endpoint de diagnóstico
 app.get('/api/debug/db-info', async (req, res) => {
     try {
         const db = mongoose.connection;
         const collections = await db.db.listCollections().toArray();
         
-        // Contar franquicias
         const Franquicia = (await import('./models/franquiciaModel.js')).default;
         const franquiciasCount = await Franquicia.countDocuments();
-        const franquicias = await Franquicia.find().limit(5);
         
         res.json({
             connected: db.readyState === 1,
@@ -98,81 +85,14 @@ app.get('/api/debug/db-info', async (req, res) => {
             host: db.host,
             collections: collections.map(c => c.name),
             franquiciasCount: franquiciasCount,
-            franquiciasMuestra: franquicias,
-            usuariosCount: await (await import('./models/Usuario.js')).default.countDocuments()
+            baseUrl: `${req.protocol}://${req.get('host')}`
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.use('/uploads/cartas', express.static(path.join(uploadsPath, 'cartas')));
-app.use('/uploads/perfiles', express.static(path.join(uploadsPath, 'perfiles')));
-app.use('/uploads/publicaciones', express.static(path.join(uploadsPath, 'publicaciones')));
-
-
-app.use('/imagesPokemon', express.static(path.join(uploadsPath, 'cartas', 'imagesPokemon')));
-app.use('/imagesMagic', express.static(path.join(uploadsPath, 'cartas', 'imagesMagic')));
-app.use('/imagesDB', express.static(path.join(uploadsPath, 'cartas', 'imagesDB')));
-app.use('/imagesYugioh', express.static(path.join(uploadsPath, 'cartas', 'imagesYugioh')));
-app.use('/imagesDigimon', express.static(path.join(uploadsPath, 'cartas', 'imagesDigimon')));
-
-
-app.get('/debug/imagen/:ruta', (req, res) => {
-    const rutaCompleta = path.join(uploadsPath, 'cartas', req.params.ruta);
-    const existe = fs.existsSync(rutaCompleta);
-    
-    res.json({
-        buscado: req.params.ruta,
-        rutaCompleta: rutaCompleta,
-        existe: existe,
-        uploadsPath: uploadsPath
-    });
-});
-
-
-app.get('/debug/listar-imagenes', (req, res) => {
-    const cartasPath = path.join(uploadsPath, 'cartas');
-    const resultado = {};
-    
-    if (fs.existsSync(cartasPath)) {
-        const carpetas = fs.readdirSync(cartasPath);
-        carpetas.forEach(carpeta => {
-            const carpetaPath = path.join(cartasPath, carpeta);
-            if (fs.statSync(carpetaPath).isDirectory()) {
-                resultado[carpeta] = fs.readdirSync(carpetaPath);
-            }
-        });
-    }
-    
-    res.json({
-        uploadsPath: uploadsPath,
-        cartasPath: cartasPath,
-        imagenes: resultado
-    });
-});
-
-// Ruta de prueba para imagen
-app.get('/test-imagen', (req, res) => {
-    const testPath = path.join(uploadsPath, 'cartas', 'imagesPokemon', 'bulbasaur.png');
-    const existe = fs.existsSync(testPath);
-    
-    res.send(`
-        <html>
-            <body>
-                <h1>Test de Imagen</h1>
-                <p>Ruta: ${testPath}</p>
-                <p>Existe: ${existe}</p>
-                ${existe ? '<img src="/uploads/cartas/imagesPokemon/bulbasaur.png" />' : '<p>Imagen no encontrada</p>'}
-                <br/>
-                <a href="/debug/listar-imagenes">Ver todas las imagenes</a>
-            </body>
-        </html>
-    `);
-});
-
-
-
+// Rutas de la API
 app.use('/api/publicaciones', publiRoutes);
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/franquicias', franquiciaRoutes);
@@ -184,38 +104,12 @@ app.use('/api/reportes', reporteRoutes);
 app.use('/api/estadisticas', estadisticaRoutes);
 
 app.get('/', (req, res) => {
-    res.send('API funcionando ');
-});
-
-
-app.get('/debug/usuario/:id', async (req, res) => {
-    try {
-        const Usuario = (await import('./models/Usuario.js')).default;
-        const usuario = await Usuario.findById(req.params.id).select('nombre nickname fotoPerfil');
-        res.json({
-            id: usuario._id,
-            nombre: usuario.nombre,
-            nickname: usuario.nickname,
-            fotoPerfil: usuario.fotoPerfil,
-           urlCompleta: `${req.protocol}://${req.get('host')}${usuario.fotoPerfil}`
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/check-image/:filename', (req, res) => {
-    const imagePath = path.join(uploadsPath, 'perfiles', req.params.filename);
-    if (fs.existsSync(imagePath)) {
-        res.json({ exists: true, path: imagePath });
-    } else {
-        res.json({ exists: false, path: imagePath });
-    }
+    res.send('API funcionando');
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`\n========================================`);
-    
+    console.log(` Servidor corriendo en puerto ${PORT}`);
+    console.log(` Base URL: http://localhost:${PORT}`);
 });

@@ -136,14 +136,17 @@ publicacionesSchema.index({ Estado: 1, createdAt: -1 });
 
 publicacionesSchema.virtual('fotosUrls').get(function() {
     if (!this.Fotos || this.Fotos.length === 0) return [];
-    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-    return this.Fotos.map(foto => `${baseUrl}/uploads/publicaciones/${foto}`);
+
+    return this.Fotos.map(foto => `/uploads/publicaciones/${foto}`);
 });
 
-// Métodos
-publicacionesSchema.methods.usuarioDioLike = function(usuarioId) {
-    return this.UsuariosMeGusta.includes(usuarioId);
+
+publicacionesSchema.methods.getFotosUrlsCompletas = function(baseUrl) {
+    if (!this.Fotos || this.Fotos.length === 0) return [];
+    return this.Fotos.map(foto => `${baseUrl}/uploads/publicaciones/${foto}`);
 };
+
+
 
 publicacionesSchema.methods.toggleLike = async function(usuarioId) {
     const index = this.UsuariosMeGusta.indexOf(usuarioId);
