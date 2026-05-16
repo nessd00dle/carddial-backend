@@ -16,6 +16,10 @@ const cartaSchema = new mongoose.Schema({
         type: String,
         required: [true, 'La imagen de la carta es obligatoria']
     },
+    imagenPublicId: {
+        type: String,  // Para Cloudinary
+        default: null
+    },
     descripcion: {
         type: String,
         trim: true,
@@ -44,31 +48,69 @@ const cartaSchema = new mongoose.Schema({
     activo: {
         type: Boolean,
         default: true
+    },
+    creadaPor: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Usuario'
     }
 }, {
     timestamps: true
 });
 
-
+// Índices
 cartaSchema.index({ nombre: 'text' });
 cartaSchema.index({ idFranquicia: 1, nombre: 1 });
 cartaSchema.index({ rareza: 1 });
 cartaSchema.index({ valorEstimado: -1 });
 
-// Método para obtener URL completa de la imagen
+
 cartaSchema.virtual('imagenUrl').get(function () {
-  if (!this.imagen) return null;
+    if (!this.imagen) return null;
 
-  // Si ya es URL completa, respétala
-  if (this.imagen.startsWith('http')) return this.imagen;
+  
+    if (this.imagen && this.imagen.includes('cloudinary.com')) {
+        return this.imagen;
+    }
 
-  // 🔥 Aquí defines de dónde salen las imágenes
-  return `http://localhost:3000/uploads/cartas/${this.imagen}`;
+
+    if (this.imagenPublicId) {
+        const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+        return `https://res.cloudinary.com/${cloudName}/image/upload/${this.imagenPublicId}`;
+    }
+
+    // Para desarrollo local o URLs antiguas
+    if (process.env.NODE_ENV === 'production') {
+     
+        return 'https://via.placeholder.com/300x300?text=Imagen+no+disponible';
+    }
+
+    // Desarrollo local (fallback)
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    if (this.imagen.startsWith('/uploads')) {
+        return `${baseUrl}${this.imagen}`;
+    }
+    
+    return `${baseUrl}/uploads/cartas/${this.imagen}`;
 });
+
+// Método para obtener imagen optimizada
+cartaSchema.methods.getImagenOptimizada = function(width = 300, height = 300) {
+    const imagenUrl = this.imagenUrl;
+    
+    if (!imagenUrl) return null;
+    
+    // Si es Cloudinary, agregar transformaciones
+    if (imagenUrl.includes('cloudinary.com')) {
+        return imagenUrl.replace('/upload/', `/upload/w_${width},h_${height},c_fill,q_auto/`);
+    }
+    
+    // Si es local, devolver la URL original
+    return imagenUrl;
+};
 
 // Método estático para buscar cartas
 cartaSchema.statics.buscarCartas = async function(termino, franquicia = null, limite = 20) {
-    let query = {};
+    let query = { activo: true };
     
     if (termino && termino.trim()) {
         query.$text = { $search: termino };
@@ -78,11 +120,8 @@ cartaSchema.statics.buscarCartas = async function(termino, franquicia = null, li
         query.idFranquicia = franquicia;
     }
     
-    query.activo = true;
-    
     return await this.find(query)
         .populate('idFranquicia', 'nombre')
-        .populate('creadaPor', 'nombre nickname')
         .limit(limite)
         .sort({ createdAt: -1 });
 };
@@ -94,11 +133,11 @@ cartaSchema.statics.obtenerPorFranquicia = async function(idFranquicia) {
         .sort({ nombre: 1 });
 };
 
-
 cartaSchema.set('toJSON', {
     virtuals: true,
     transform: function(doc, ret) {
         delete ret.__v;
+        delete ret.imagenPublicId; 
         return ret;
     }
 });
